@@ -2,6 +2,7 @@ package migrationmanager
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dickmanben/migrationmanager/db"
 )
@@ -78,6 +79,12 @@ func getMigrationsThatHaveBeenRan() ([]Migration, error) {
 	defer conn.Close()
 	migrations := []Migration{}
 	if err := conn.Model(&migrations).Order("created_at DESC").Select(); err != nil {
+		if strings.Contains(err.Error(), "ERROR #42P01") {
+			if err := SetupTable(); err != nil {
+				return nil, err
+			}
+			return getMigrationsThatHaveBeenRan()
+		}
 		return nil, err
 	}
 	return migrations, nil
