@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dickmanben/migrationmanager/db"
+	"github.com/go-pg/pg/v10"
 )
 
 //
 // MigrateUp runs the up function for migrations
 //
-func MigrateUp(migrations []Migration) (bool, error) {
-	previousMigrations, err := getMigrationsThatHaveBeenRan()
+func MigrateUp(migrations []Migration, connect func() *pg.DB) (bool, error) {
+	previousMigrations, err := getMigrationsThatHaveBeenRan(connect)
 	if err != nil {
 		fmt.Printf("Unable to retrived previous migrations: %s\n", err)
 		return false, err
@@ -26,7 +26,7 @@ func MigrateUp(migrations []Migration) (bool, error) {
 		if err := migration.Up(); err != nil {
 			return false, fmt.Errorf("migration %s has failed with error: %s", migration.Name, err)
 		}
-		if err := addMigration(migration); err != nil {
+		if err := addMigration(migration, connect); err != nil {
 			return false, fmt.Errorf("unable to insert migration: %s", err)
 		}
 		fmt.Printf("Finished Migration: %s\n", migration.Name)
@@ -38,8 +38,8 @@ func MigrateUp(migrations []Migration) (bool, error) {
 //
 // MigrateDown runs the down scripts for migrations
 //
-func MigrateDown(migrations []Migration) (bool, error) {
-	previousMigrations, err := getMigrationsThatHaveBeenRan()
+func MigrateDown(migrations []Migration, connect func() *pg.DB) (bool, error) {
+	previousMigrations, err := getMigrationsThatHaveBeenRan(connect)
 	if err != nil {
 		fmt.Printf("Unable to retrived previous migrations: %s\n", err)
 		return false, err
@@ -56,7 +56,7 @@ func MigrateDown(migrations []Migration) (bool, error) {
 		if err := migration.Down(); err != nil {
 			return false, fmt.Errorf("migration %s has failed with error: %s", migration.Name, err)
 		}
-		if err := removeMigration(existingMigration); err != nil {
+		if err := removeMigration(existingMigration, connect); err != nil {
 			return false, fmt.Errorf("unable to insert migration: %s", err)
 		}
 		fmt.Printf("Finished Migration: %s\n", migration.Name)
@@ -74,24 +74,24 @@ func getExistingMigration(name string, previousMigrations []Migration) *Migratio
 	return nil
 }
 
-func getMigrationsThatHaveBeenRan() ([]Migration, error) {
-	conn := db.Connect()
+func getMigrationsThatHaveBeenRan(connect func() *pg.DB) ([]Migration, error) {
+	conn := connect()
 	defer conn.Close()
 	migrations := []Migration{}
 	if err := conn.Model(&migrations).Order("created_at DESC").Select(); err != nil {
 		if strings.Contains(err.Error(), "ERROR #42P01") {
-			if err := SetupTable(); err != nil {
+			if err := SetupTable(connect); err != nil {
 				return nil, err
 			}
-			return getMigrationsThatHaveBeenRan()
+			return getMigrationsThatHaveBeenRan(connect)
 		}
 		return nil, err
 	}
 	return migrations, nil
 }
 
-func addMigration(migration Migration) error {
-	conn := db.Connect()
+func addMigration(migration Migration, connect func() *pg.DB) error {
+	conn := connect()
 	defer conn.Close()
 	if _, err := conn.Model(&migration).Insert(&migration); err != nil {
 		return err
@@ -99,8 +99,8 @@ func addMigration(migration Migration) error {
 	return nil
 }
 
-func removeMigration(migration *Migration) error {
-	conn := db.Connect()
+func removeMigration(migration *Migration, connect func() *pg.DB) error {
+	conn := connect()
 	defer conn.Close()
 	if _, err := conn.Model(migration).WherePK().Delete(); err != nil {
 		return err
