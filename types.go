@@ -13,8 +13,8 @@ type Migration struct {
 	ID            int          `json:"id" sql:",pk"`
 	Name          string       `json:"name"`
 	CreatedAt     time.Time    `json:"createdAt"`
-	Up            func() error `pg:"-"`
-	Down          func() error `pg:"-"`
+	Up            func() error `bun:"-"`
+	Down          func() error `bun:"-"`
 }
 
 // BeforeInsert hook
