@@ -1,18 +1,19 @@
 package migrationmanager
 
 import (
-	"github.com/go-pg/pg/v10"
-	"github.com/go-pg/pg/v10/orm"
+	"context"
+
+	"github.com/uptrace/bun"
 )
 
 //
 // SetupTable creates a table if not existing.
 //
-func SetupTable(connect func() *pg.DB) error {
+func SetupTable(connect func() *bun.DB) error {
 	conn := connect()
 	defer conn.Close()
 	m := Migration{}
-	if err := conn.Model(&m).CreateTable(&orm.CreateTableOptions{IfNotExists: true}); err != nil {
+	if _, err := conn.NewCreateTable().Model(&m).Exec(context.Background()); err != nil {
 		return err
 	}
 	return nil

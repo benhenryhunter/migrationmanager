@@ -1,16 +1,17 @@
 package migrationmanager
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/go-pg/pg/v10"
+	"github.com/uptrace/bun"
 )
 
 //
 // MigrateUp runs the up function for migrations
 //
-func MigrateUp(migrations []Migration, connect func() *pg.DB) (bool, error) {
+func MigrateUp(migrations []Migration, connect func() *bun.DB) (bool, error) {
 	previousMigrations, err := getMigrationsThatHaveBeenRan(connect)
 	if err != nil {
 		fmt.Printf("Unable to retrived previous migrations: %s\n", err)
@@ -38,7 +39,7 @@ func MigrateUp(migrations []Migration, connect func() *pg.DB) (bool, error) {
 //
 // MigrateDown runs the down scripts for migrations
 //
-func MigrateDown(migrations []Migration, connect func() *pg.DB) (bool, error) {
+func MigrateDown(migrations []Migration, connect func() *bun.DB) (bool, error) {
 	previousMigrations, err := getMigrationsThatHaveBeenRan(connect)
 	if err != nil {
 		fmt.Printf("Unable to retrived previous migrations: %s\n", err)
@@ -74,11 +75,11 @@ func getExistingMigration(name string, previousMigrations []Migration) *Migratio
 	return nil
 }
 
-func getMigrationsThatHaveBeenRan(connect func() *pg.DB) ([]Migration, error) {
+func getMigrationsThatHaveBeenRan(connect func() *bun.DB) ([]Migration, error) {
 	conn := connect()
 	defer conn.Close()
 	migrations := []Migration{}
-	if err := conn.Model(&migrations).Order("created_at DESC").Select(); err != nil {
+	if err := conn.NewSelect().Model(&migrations).Order("created_at DESC").Scan(context.Background()); err != nil {
 		if strings.Contains(err.Error(), "ERROR #42P01") {
 			if err := SetupTable(connect); err != nil {
 				return nil, err
@@ -90,19 +91,19 @@ func getMigrationsThatHaveBeenRan(connect func() *pg.DB) ([]Migration, error) {
 	return migrations, nil
 }
 
-func addMigration(migration Migration, connect func() *pg.DB) error {
+func addMigration(migration Migration, connect func() *bun.DB) error {
 	conn := connect()
 	defer conn.Close()
-	if _, err := conn.Model(&migration).Insert(&migration); err != nil {
+	if _, err := conn.NewInsert().Model(&migration).Exec(context.Background()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func removeMigration(migration *Migration, connect func() *pg.DB) error {
+func removeMigration(migration *Migration, connect func() *bun.DB) error {
 	conn := connect()
 	defer conn.Close()
-	if _, err := conn.Model(migration).WherePK().Delete(); err != nil {
+	if _, err := conn.NewDelete().Model(migration).WherePK().Exec(context.Background()); err != nil {
 		return err
 	}
 	return nil
