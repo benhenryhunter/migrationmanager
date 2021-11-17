@@ -3,16 +3,18 @@ package migrationmanager
 import (
 	"context"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 // Migration represents a migration
 type Migration struct {
-	tableName struct{}     `pg:"managed_migrations"`
-	ID        int          `json:"id" sql:",pk"`
-	Name      string       `json:"name"`
-	CreatedAt time.Time    `json:"createdAt"`
-	Up        func() error `pg:"-"`
-	Down      func() error `pg:"-"`
+	bun.BaseModel `bun:"managed_migrations"`
+	ID            int          `json:"id" sql:",pk"`
+	Name          string       `json:"name"`
+	CreatedAt     time.Time    `json:"createdAt"`
+	Up            func() error `pg:"-"`
+	Down          func() error `pg:"-"`
 }
 
 // BeforeInsert hook
